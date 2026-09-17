@@ -1,0 +1,182 @@
+/* Webview styling. Uses VS Code theme variables only — never hard-coded colours,
+   so the panel follows whatever theme the user has. */
+
+:root {
+  color-scheme: light dark;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  color: var(--vscode-foreground);
+  background: var(--vscode-sideBar-background);
+}
+
+/* ---- transcript ---- */
+
+#log {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.msg {
+  padding: 8px 10px;
+  border-radius: 6px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.msg.user {
+  background: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, transparent);
+}
+
+.msg.assistant {
+  background: var(--vscode-editor-background);
+}
+
+.msg.error {
+  color: var(--vscode-errorForeground);
+  font-size: 12px;
+}
+
+.trace {
+  padding: 4px 8px;
+  font-family: var(--vscode-editor-font-family);
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  border-left: 2px solid var(--vscode-focusBorder);
+}
+
+.trace.guard {
+  color: var(--vscode-errorForeground);
+  border-left-color: var(--vscode-errorForeground);
+}
+
+/* ---- approval card ---- */
+
+.card {
+  border: 1px solid var(--vscode-focusBorder);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.card header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--vscode-editorWidget-background);
+}
+
+.card .stat {
+  margin-left: auto;
+  font-weight: 400;
+  color: var(--vscode-descriptionForeground);
+}
+
+.card .diff {
+  margin: 0;
+  max-height: 260px;
+  overflow: auto;
+  padding: 8px 10px;
+  font-family: var(--vscode-editor-font-family);
+  font-size: 11.5px;
+  line-height: 1.4;
+  background: var(--vscode-editor-background);
+}
+
+.card .diff .add {
+  color: var(--vscode-gitDecoration-addedResourceForeground, #4ec94e);
+}
+
+.card .diff .del {
+  color: var(--vscode-gitDecoration-deletedResourceForeground, #f14c4c);
+}
+
+.card .diff .meta {
+  color: var(--vscode-descriptionForeground);
+}
+
+.card .actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  background: var(--vscode-editorWidget-background);
+}
+
+/* ---- composer ---- */
+
+#composer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-top: 1px solid var(--vscode-panel-border);
+}
+
+textarea {
+  resize: none;
+  padding: 6px;
+  font: inherit;
+  color: var(--vscode-input-foreground);
+  background: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, var(--vscode-focusBorder));
+  border-radius: 4px;
+}
+
+#bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#bar .spacer {
+  flex: 1;
+}
+
+#status {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+}
+
+button {
+  padding: 4px 12px;
+  font: inherit;
+  font-size: 12px;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  color: var(--vscode-button-foreground);
+  background: var(--vscode-button-background);
+}
+
+button.secondary {
+  color: var(--vscode-button-secondaryForeground);
+  background: var(--vscode-button-secondaryBackground);
+}
+
+button.link {
+  padding: 0;
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  background: none;
+  text-decoration: underline dotted;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

@@ -1,0 +1,10 @@
+.vscode/**
+.tmp/**
+src/**
+out/**
+test/**
+node_modules/**
+esbuild.js
+tsconfig.json
+ARCHITECTURE.md
+media/globals.d.ts

@@ -1,0 +1,152 @@
+{
+  "name": "dconx-agent",
+  "displayName": "Dconx Agent",
+  "description": "Local-only coding agent powered by Ollama, with diff-approval and path guardrails.",
+  "version": "0.0.1",
+  "publisher": "dconx",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "AI",
+    "Programming Languages"
+  ],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "dconx-agent",
+          "title": "Dconx Agent",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "dconx-agent": [
+        {
+          "type": "webview",
+          "id": "dconx.chat",
+          "name": "Chat"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "dconx.newTask",
+        "title": "Dconx: New Task",
+        "icon": "$(add)"
+      },
+      {
+        "command": "dconx.pickModel",
+        "title": "Dconx: Select Ollama Model"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "dconx.newTask",
+          "when": "view == dconx.chat",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Dconx Agent",
+      "properties": {
+        "dconx.ollama.baseUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:11434",
+          "description": "Base URL of the local Ollama server."
+        },
+        "dconx.ollama.model": {
+          "type": "string",
+          "default": "qwen2.5-coder:7b",
+          "description": "Ollama model to use. Must support tool calling."
+        },
+        "dconx.ollama.temperature": {
+          "type": "number",
+          "default": 0.2,
+          "description": "Sampling temperature."
+        },
+        "dconx.ollama.numCtx": {
+          "type": "number",
+          "default": 16384,
+          "description": "Context window (num_ctx) requested from Ollama."
+        },
+        "dconx.agent.maxIterations": {
+          "type": "number",
+          "default": 12,
+          "description": "Maximum tool-call rounds per task before the agent stops and asks."
+        },
+        "dconx.guard.denyGlobs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "**/.git/**",
+            "**/node_modules/**",
+            "**/.env",
+            "**/.env.*",
+            "**/*.pem",
+            "**/*.key",
+            "**/id_rsa*",
+            "**/package-lock.json",
+            "**/pnpm-lock.yaml",
+            "**/yarn.lock",
+            "**/dist/**",
+            "**/build/**",
+            "**/out/**"
+          ],
+          "description": "Glob patterns the agent may never read or write."
+        },
+        "dconx.guard.allowGlobs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "If non-empty, the agent may only touch files matching these globs (deny list still wins)."
+        },
+        "dconx.guard.maxEditLines": {
+          "type": "number",
+          "default": 400,
+          "description": "Reject any single proposed edit that changes more lines than this."
+        },
+        "dconx.guard.maxFileBytes": {
+          "type": "number",
+          "default": 262144,
+          "description": "Refuse to read or write files larger than this many bytes."
+        },
+        "dconx.guard.allowCreate": {
+          "type": "boolean",
+          "default": true,
+          "description": "Allow the agent to propose creating new files."
+        },
+        "dconx.guard.allowDelete": {
+          "type": "boolean",
+          "default": false,
+          "description": "Allow the agent to propose deleting files. Off by default."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run check && npm run build",
+    "build": "node esbuild.js --production",
+    "watch": "node esbuild.js --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "node test/run.js",
+    "check": "npm run typecheck && npm test"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.23.0",
+    "typescript": "^5.5.4"
+  }
+}
