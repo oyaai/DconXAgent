@@ -5,11 +5,18 @@
   color-scheme: light dark;
 }
 
+html,
+body {
+  height: 100%;
+}
+
 body {
   margin: 0;
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  /* The page itself never scrolls; #log does. Without this the transcript can
+     push the composer (and the Approve buttons) off-screen. */
+  overflow: hidden;
   font-family: var(--vscode-font-family);
   font-size: var(--vscode-font-size);
   color: var(--vscode-foreground);
@@ -19,15 +26,40 @@ body {
 /* ---- transcript ---- */
 
 #log {
-  flex: 1;
+  flex: 1 1 auto;
+  /* REQUIRED. A flex item defaults to min-height:auto, which refuses to shrink
+     below its content — the transcript then grows past the viewport and nothing
+     scrolls, putting the approval buttons out of reach. This was a real bug. */
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
+/* VS Code webviews render a very faint default scrollbar; make it visible so it
+   is obvious the transcript can be scrolled. */
+#log::-webkit-scrollbar {
+  width: 10px;
+}
+
+#log::-webkit-scrollbar-thumb {
+  background: var(--vscode-scrollbarSlider-background, rgba(121, 121, 121, 0.4));
+  border-radius: 5px;
+}
+
+#log::-webkit-scrollbar-thumb:hover {
+  background: var(--vscode-scrollbarSlider-hoverBackground, rgba(100, 100, 100, 0.7));
+}
+
+#log::-webkit-scrollbar-thumb:active {
+  background: var(--vscode-scrollbarSlider-activeBackground, rgba(191, 191, 191, 0.4));
+}
+
 .msg {
+  flex: 0 0 auto;
   padding: 8px 10px;
   border-radius: 6px;
   line-height: 1.45;
@@ -50,6 +82,7 @@ body {
 }
 
 .trace {
+  flex: 0 0 auto;
   padding: 4px 8px;
   font-family: var(--vscode-editor-font-family);
   font-size: 11px;
@@ -65,6 +98,7 @@ body {
 /* ---- approval card ---- */
 
 .card {
+  flex: 0 0 auto;
   border: 1px solid var(--vscode-focusBorder);
   border-radius: 6px;
   overflow: hidden;
@@ -109,7 +143,65 @@ body {
   color: var(--vscode-descriptionForeground);
 }
 
+.card.command header .title::before {
+  content: "\25B6  ";
+  color: var(--vscode-descriptionForeground);
+}
+
+.card .cmd {
+  margin: 0;
+  padding: 10px;
+  font-family: var(--vscode-editor-font-family);
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--vscode-editor-background);
+}
+
+.card .cmd .cwd {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.card.created header {
+  background: var(--vscode-editorWidget-background);
+}
+
+.card.created header .title::before {
+  content: "+ ";
+  color: var(--vscode-gitDecoration-addedResourceForeground, #4ec94e);
+  font-weight: 700;
+}
+
+.card.created .actions {
+  padding: 6px 10px;
+}
+
+.card.question header .title {
+  font-weight: 600;
+  white-space: pre-wrap;
+}
+
+.card .actions.choices {
+  flex-wrap: wrap;
+}
+
+.card .actions.choices button {
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+}
+
+.card .actions.choices button:hover {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
 .card .actions {
+  /* Sticky so Approve/Reject stay visible while scrolling a long diff. */
+  position: sticky;
+  bottom: 0;
   display: flex;
   gap: 8px;
   align-items: center;
@@ -120,6 +212,8 @@ body {
 /* ---- composer ---- */
 
 #composer {
+  /* Never shrinks — the input and Stop button stay reachable at any height. */
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   gap: 6px;

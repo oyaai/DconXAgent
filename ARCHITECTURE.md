@@ -14,28 +14,45 @@ and let `src/vscode` supply it.
 ## Layers
 
 ```
-media/            webview assets (css, js) — the only browser-side code
+media/            the chat UI — shared verbatim by BOTH frontends
+  chat.body.html  the markup
   chat.css        styling, VS Code theme variables only
   chat.js         behaviour; type-checked against src/protocol.ts via JSDoc
+  web-bridge.js   maps acquireVsCodeApi() onto SSE + POST so chat.js runs in a browser
+  web-theme.css   supplies the --vscode-* variables outside VS Code
   globals.d.ts    ambient acquireVsCodeApi()
 
 src/protocol.ts   the typed message union shared by both sides of the webview
+
+src/node/         adapters shared by both frontends — no vscode import
+  shellPort.ts    process execution
+  undoRegistry.ts undo for auto-created files
+  fileConfig.ts   dconx.config.json + env, for the web UI
+
+src/web/          the local web server frontend
+  server.ts       http + SSE, wires the same Agent
+  editorPort.ts   NoEditorPort — reports honestly that there is no editor
 
 src/vscode/       VS Code adapters — every vscode import lives under here
   config.ts             the ONLY reader of workspace settings
   chatViewProvider.ts   translates AgentEvent <-> protocol messages
   approvals.ts          holds pending approval promises, resolves them once
+  editorPort.ts         active file, selection, open tabs, Problems panel
+  shellPort.ts          spawns approved commands (the only spawn in the codebase)
+  undoRegistry.ts       remembers auto-created files so Undo can delete them safely
   proposalProvider.ts   serves proposed content to the native diff editor
   commands.ts           command registrations
   webviewHtml.ts        the html shell
 
-src/core/         pure logic, no vscode
+src/core/         pure logic, no vscode, no child_process
   config.ts       config shapes + DEFAULT_CONFIG
   errors.ts       GuardError, OllamaError
+  ports.ts        EditorPort / ShellPort — what core needs FROM the environment
   agent.ts        the loop; talks to the outside through AgentHost
-  prompt.ts       the system prompt
+  prompt.ts       the system prompt — treat it as code; it has its own test suite
   ollama.ts       HTTP transport
   guard.ts        path containment, allow/deny lists, size caps
+  commandGuard.ts command allowlist + metacharacter rejection
   glob.ts         the glob matcher the guard uses
   diff.ts         LCS unified diff
   tools/          one file per tool + the registry
@@ -59,11 +76,29 @@ user types
                                                                        └─ fs.writeFile (only here)
 ```
 
-Two chokepoints are worth protecting:
+Three chokepoints are worth protecting, each asserted by `test/boundary.test.js`:
 
 - **`src/core/guard.ts`** — every model-supplied path goes through `resolveSafePath`.
-- **`src/core/tools/editGate.ts`** — the only `fs.writeFile` in `src/core`, and it
-  runs only after `requestApproval` resolves `true`. A boundary test asserts this.
+- **`src/core/tools/editGate.ts`** — the only `fs.writeFile` in `src/core`. An edit to an
+  existing file runs only after `approve.requestEdit` resolves `true`. A *creation* may be
+  auto-approved (`autoApproveCreate`), because it cannot overwrite anything and the UI
+  offers Undo; `undoRegistry.ts` deletes such a file only while its bytes are unchanged.
+- **`src/core/tools/runCommand.ts`** — the only caller of `shell.run`, and only after
+  `commandGuard.parseCommand` accepted the command AND `approve.requestCommand` resolved
+  `true`.
+
+## Ports
+
+Core never imports `vscode` or `child_process`. When it needs the environment, it declares
+an interface in `src/core/ports.ts` and `src/vscode` implements it:
+
+| Port | Implemented by | Gives the agent |
+|---|---|---|
+| `EditorPort` | `vscode/editorPort.ts` | active file, selection, open tabs, diagnostics |
+| `ShellPort` | `vscode/shellPort.ts` | process execution for already-approved commands |
+| `ApprovalPort` | `vscode/approvals.ts` | the human gate for edits and commands |
+
+Adding a capability that needs an editor or OS API means adding a port, not an import.
 
 ## Recipes
 
@@ -107,6 +142,13 @@ dispatcher turns it into a `GUARD: …` result the model can recover from.
 `npm run typecheck` covers both sides — `media/chat.js` is checked against the
 same union via `// @ts-check`.
 
+### Add a frontend
+
+There are two already — `src/vscode` and `src/web` — and they share everything below
+the transport. A third would supply the same three things: an `ApprovalPort`, an
+`EditorPort`, and a way to move `HostMessage`/`ViewMessage` between the agent and the
+UI. If you reuse `media/chat.js`, copy what `media/web-bridge.js` does.
+
 ### Target a different local runtime
 
 Rewrite `src/core/ollama.ts` to speak the other API and keep `chat()` and
@@ -124,11 +166,21 @@ in plain Node — no VS Code, no framework.
 | `guard` | containment, deny/allow lists, size caps |
 | `glob` | the matcher behind the deny list |
 | `diff` | hunk splitting, CRLF, creation/deletion counts |
-| `tools` | registry invariants, and that a rejected edit leaves the file byte-identical |
+| `commandGuard` | allowlist token matching, and that every chaining attempt is refused |
+| `prompt` | the anti-patterns and new-project flow that fixed observed model failures |
+| `tools` | registry invariants; that a rejected edit leaves the file byte-identical; that a blocked command never reaches the user or the shell |
+| `web` | the web frontend end-to-end against a fake Ollama: a real file is created, streamed to the browser, and undone — plus the remote auth header |
+| `webview` | the chat layout contract (the flex `min-height: 0` scroll bug), the activity-bar icon, and that both frontends render the same shared markup |
 
 `npm run check` = typecheck + tests. Run it before opening a PR.
 
+## Packaging
+
+`npm run package` runs `check`, builds the bundle and produces `dconx-agent.vsix` via
+vsce. `.vscodeignore` keeps `src/`, `test/` and `node_modules/` out of it — the shipped
+extension is `dist/extension.js` plus `media/`.
+
 ## Deliberate omissions
 
-No shell tool, no streaming, no auto-approve, no MCP, no checkpoints. See the
-README for why, and for where a shell tool would plug in.
+No free-form shell, no streaming, no auto-approve, no MCP, no checkpoints, no deletion.
+See the README for why.

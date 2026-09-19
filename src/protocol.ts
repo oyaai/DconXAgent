@@ -30,7 +30,19 @@ export type HostMessage =
       added: number;
       removed: number;
     }
-  | { type: "approvalResolved"; id: string; approved: boolean };
+  | {
+      type: "commandApproval";
+      id: string;
+      command: string;
+      cwd: string;
+      /** The allowlist entry that permitted it. */
+      rule: string;
+    }
+  | { type: "created"; id: string; relPath: string; added: number }
+  | { type: "undoResult"; id: string; ok: boolean; reason?: string }
+  | { type: "question"; question: string; options: string[] }
+  | { type: "approvalResolved"; id: string; approved: boolean }
+  | { type: "commandResult"; command: string; exitCode: number | null };
 
 export type AgentState = "thinking" | "idle" | "cancelled";
 
@@ -41,4 +53,5 @@ export type ViewMessage =
   | { type: "cancel" }
   | { type: "pickModel" }
   | { type: "approve"; id: string }
+  | { type: "undo"; id: string }
   | { type: "reject"; id: string };

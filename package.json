@@ -4,7 +4,6 @@
   "description": "Local-only coding agent powered by Ollama, with diff-approval and path guardrails.",
   "version": "0.0.1",
   "publisher": "dconx",
-  "private": true,
   "license": "MIT",
   "engines": {
     "vscode": "^1.85.0"
@@ -36,6 +35,10 @@
     },
     "commands": [
       {
+        "command": "dconx.openChat",
+        "title": "Dconx Agent: Open Chat"
+      },
+      {
         "command": "dconx.newTask",
         "title": "Dconx: New Task",
         "icon": "$(add)"
@@ -60,7 +63,8 @@
         "dconx.ollama.baseUrl": {
           "type": "string",
           "default": "http://127.0.0.1:11434",
-          "description": "Base URL of the local Ollama server."
+          "description": "Base URL of the local Ollama server.",
+          "markdownDescription": "Base URL of the Ollama server. Local (`http://127.0.0.1:11434`) or remote (`https://ollama.example.com`). Use the server root — no `/api` or `/v1` suffix."
         },
         "dconx.ollama.model": {
           "type": "string",
@@ -131,9 +135,81 @@
           "type": "boolean",
           "default": false,
           "description": "Allow the agent to propose deleting files. Off by default."
+        },
+        "dconx.guard.allowCommands": {
+          "type": "boolean",
+          "default": true,
+          "description": "Allow the agent to propose running commands from the allowlist. Every run still requires your approval. Turn off for a read-and-edit-only agent."
+        },
+        "dconx.guard.commandAllowlist": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "npm test",
+            "npm run build",
+            "npm run typecheck",
+            "npm run check",
+            "npm run lint",
+            "npx tsc --noEmit",
+            "node --version",
+            "python -m pytest",
+            "pytest",
+            "git status",
+            "git diff",
+            "git log",
+            "git branch"
+          ],
+          "markdownDescription": "Commands the agent may propose, matched on whole leading tokens (`git log` does not permit `git push`). Shell metacharacters are always rejected."
+        },
+        "dconx.guard.commandTimeoutMs": {
+          "type": "number",
+          "default": 120000,
+          "description": "Kill an approved command after this many milliseconds."
+        },
+        "dconx.guard.commandOutputLimit": {
+          "type": "number",
+          "default": 8000,
+          "description": "Characters of command output handed back to the model."
+        },
+        "dconx.agent.scratchFolder": {
+          "type": "string",
+          "default": "dconx-scratch",
+          "description": "Workspace-relative folder the agent offers for throwaway work, such as a new project scaffold you are only trying out. Must not start with a dot."
+        },
+        "dconx.guard.autoApproveCreate": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Write **new** files without asking for approval, so scaffolding a project does not become a dozen identical clicks. Each auto-created file is listed in the panel with an Undo button. Editing an **existing** file always requires approval and is never affected by this setting."
+        },
+        "dconx.ollama.apiKey": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Bearer token for a remote Ollama server. Leave empty for a local one. **Stored in plain text in settings.json** — prefer the `OLLAMA_API_KEY` environment variable, which takes precedence over this."
+        },
+        "dconx.ollama.headers": {
+          "type": "object",
+          "default": {},
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Extra HTTP headers sent with every request, for gateways that need their own."
+        },
+        "dconx.ollama.requestTimeoutMs": {
+          "type": "number",
+          "default": 300000,
+          "description": "Give up on a request that has produced no response in this many milliseconds. Raise it for a big model on a slow remote host."
         }
       }
-    }
+    },
+    "keybindings": [
+      {
+        "command": "dconx.openChat",
+        "key": "ctrl+alt+d",
+        "mac": "cmd+alt+d"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run check && npm run build",
@@ -141,12 +217,20 @@
     "watch": "node esbuild.js --watch",
     "typecheck": "tsc --noEmit",
     "test": "node test/run.js",
-    "check": "npm run typecheck && npm test"
+    "check": "npm run typecheck && npm test",
+    "package": "npm run check && npm run build && vsce package --no-dependencies --out dconx-agent.vsix",
+    "web": "node esbuild.js --production && node dist/web-server.js"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
     "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^4.0.0",
     "esbuild": "^0.23.0",
     "typescript": "^5.5.4"
+  },
+  "icon": "media/icon128.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/oyaai/dconx-agent"
   }
 }

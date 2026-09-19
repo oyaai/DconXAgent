@@ -21,6 +21,9 @@ const stopButton = /** @type {HTMLButtonElement} */ (document.getElementById("st
 const modelButton = /** @type {HTMLButtonElement} */ (document.getElementById("model"));
 const statusLabel = /** @type {HTMLSpanElement} */ (document.getElementById("status"));
 const cardTemplate = /** @type {HTMLTemplateElement} */ (document.getElementById("approval-card"));
+const commandTemplate = /** @type {HTMLTemplateElement} */ (document.getElementById("command-card"));
+const questionTemplate = /** @type {HTMLTemplateElement} */ (document.getElementById("question-card"));
+const createdTemplate = /** @type {HTMLTemplateElement} */ (document.getElementById("created-card"));
 
 /* ---------- transcript ---------- */
 
@@ -98,6 +101,134 @@ function appendApprovalCard(msg) {
 }
 
 /**
+ * A command the agent wants to run. Shown as its own card so it never looks like
+ * a file edit — approving this one starts a process.
+ * @param {Extract<HostMessage, {type: "commandApproval"}>} msg
+ */
+function appendCommandCard(msg) {
+  const card = /** @type {HTMLElement} */ (
+    commandTemplate.content.cloneNode(true)
+  ).firstElementChild;
+  if (!card) return;
+
+  /** @type {HTMLElement} */ (card.querySelector(".stat")).textContent = `allowed by: ${msg.rule}`;
+
+  const cmd = /** @type {HTMLElement} */ (card.querySelector(".cmd"));
+  cmd.textContent = msg.command;
+  const cwd = document.createElement("span");
+  cwd.className = "cwd";
+  cwd.textContent = `in ${msg.cwd}`;
+  cmd.appendChild(cwd);
+
+  const actions = /** @type {HTMLElement} */ (card.querySelector(".actions"));
+  actions.dataset.editId = msg.id;
+  for (const button of actions.querySelectorAll("button")) {
+    button.addEventListener("click", () => {
+      vscode.postMessage(
+        button.dataset.act === "approve"
+          ? { type: "approve", id: msg.id }
+          : { type: "reject", id: msg.id }
+      );
+    });
+  }
+
+  append(/** @type {HTMLElement} */ (card));
+  log.scrollTop = log.scrollHeight;
+}
+
+/**
+ * A file the agent created without asking. Auto-approval is only reasonable if
+ * it is reversible, so this card always carries an Undo.
+ * @param {Extract<HostMessage, {type: "created"}>} msg
+ */
+function appendCreatedCard(msg) {
+  const card = /** @type {HTMLElement} */ (
+    createdTemplate.content.cloneNode(true)
+  ).firstElementChild;
+  if (!card) return;
+
+  /** @type {HTMLElement} */ (card.querySelector(".title")).textContent = `Created ${msg.relPath}`;
+  /** @type {HTMLElement} */ (card.querySelector(".stat")).textContent = `${msg.added} lines`;
+
+  const actions = /** @type {HTMLElement} */ (card.querySelector(".actions"));
+  actions.dataset.editId = msg.id;
+  const button = /** @type {HTMLButtonElement} */ (actions.querySelector("button"));
+  button.addEventListener("click", () => {
+    button.disabled = true;
+    vscode.postMessage({ type: "undo", id: msg.id });
+  });
+
+  append(/** @type {HTMLElement} */ (card));
+}
+
+/**
+ * @param {Extract<HostMessage, {type: "undoResult"}>} msg
+ */
+function settleUndo(msg) {
+  const actions = /** @type {HTMLElement | null} */ (
+    log.querySelector(`.actions[data-edit-id="${CSS.escape(msg.id)}"]`)
+  );
+  if (!actions) return;
+
+  if (msg.ok) {
+    const card = actions.closest(".card");
+    if (card) {
+      /** @type {HTMLElement} */ (card.querySelector(".title")).textContent = "Undone — file deleted";
+      /** @type {HTMLElement} */ (card.querySelector(".stat")).textContent = "";
+      card.classList.remove("created");
+    }
+    actions.textContent = "";
+    return;
+  }
+
+  actions.textContent = "";
+  const note = document.createElement("span");
+  note.className = "stat";
+  note.textContent = msg.reason ?? "Could not undo.";
+  actions.appendChild(note);
+}
+
+/**
+ * A question from the agent. Clicking an option sends it as the next message, so
+ * the user never has to retype an answer the model already spelled out.
+ * @param {Extract<HostMessage, {type: "question"}>} msg
+ */
+function appendQuestionCard(msg) {
+  const card = /** @type {HTMLElement} */ (
+    questionTemplate.content.cloneNode(true)
+  ).firstElementChild;
+  if (!card) return;
+
+  /** @type {HTMLElement} */ (card.querySelector(".title")).textContent = msg.question;
+  const choices = /** @type {HTMLElement} */ (card.querySelector(".choices"));
+
+  if (msg.options.length === 0) {
+    const hint = document.createElement("span");
+    hint.className = "stat";
+    hint.textContent = "Type your answer below.";
+    choices.appendChild(hint);
+  }
+
+  for (const option of msg.options) {
+    const button = document.createElement("button");
+    button.textContent = option;
+    button.addEventListener("click", () => {
+      choices.textContent = "";
+      const note = document.createElement("span");
+      note.className = "stat";
+      note.textContent = option;
+      choices.appendChild(note);
+      appendText("msg user", option);
+      vscode.postMessage({ type: "send", text: option });
+    });
+    choices.appendChild(button);
+  }
+
+  append(/** @type {HTMLElement} */ (card));
+  log.scrollTop = log.scrollHeight;
+}
+
+/**
  * Replaces a card's buttons once the host confirms the outcome, so the UI never
  * claims an edit was applied before it actually was.
  * @param {string} id
@@ -108,10 +239,17 @@ function settleApprovalCard(id, approved) {
     log.querySelector(`.actions[data-edit-id="${CSS.escape(id)}"]`)
   );
   if (!actions) return;
+  const wasCommand = actions.closest(".command") !== null;
   actions.textContent = "";
   const note = document.createElement("span");
   note.className = "stat";
-  note.textContent = approved ? "Applied." : "Rejected.";
+  note.textContent = approved
+    ? wasCommand
+      ? "Running…"
+      : "Applied."
+    : wasCommand
+      ? "Skipped."
+      : "Rejected.";
   actions.appendChild(note);
 }
 
@@ -167,6 +305,24 @@ window.addEventListener("message", (event) => {
     }
     case "approval":
       appendApprovalCard(msg);
+      break;
+    case "commandApproval":
+      appendCommandCard(msg);
+      break;
+    case "created":
+      appendCreatedCard(msg);
+      break;
+    case "undoResult":
+      settleUndo(msg);
+      break;
+    case "question":
+      appendQuestionCard(msg);
+      break;
+    case "commandResult":
+      appendText(
+        msg.exitCode === 0 ? "trace" : "trace guard",
+        `${msg.command} → exit ${msg.exitCode === null ? "?" : msg.exitCode}`
+      );
       break;
     case "approvalResolved":
       settleApprovalCard(msg.id, msg.approved);

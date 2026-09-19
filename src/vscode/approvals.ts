@@ -1,31 +1,48 @@
 /**
- * Bridges the agent's `requestApproval` promise to the user's click.
+ * Bridges the agent's approval requests to the user's click.
  *
- * Owns exactly one job: hold the pending promises and resolve them once. Keeping
- * this separate from the view provider makes the "every edit awaits a human"
- * invariant easy to read — and easy to keep true if the UI changes.
+ * Owns exactly one job: hold the pending promises and resolve each one once.
+ * Keeping this separate from the view provider makes the "nothing irreversible
+ * happens without a human" invariant easy to read — and easy to keep true if the
+ * UI changes.
  */
 
 import * as vscode from "vscode";
-import type { PendingEdit } from "../core/tools";
+import type { ApprovalPort, PendingCommand, PendingEdit } from "../core/tools";
 import { ProposalProvider } from "./proposalProvider";
 
 type Resolver = (approved: boolean) => void;
 
-export class ApprovalBroker {
-  private readonly pending = new Map<string, { resolve: Resolver; uri: vscode.Uri }>();
+interface PendingEntry {
+  resolve: Resolver;
+  /** Set for edits only: the proposed-content uri to release afterwards. */
+  uri?: vscode.Uri;
+}
 
-  constructor(private readonly proposals: ProposalProvider) {}
+export interface ApprovalAnnouncer {
+  announceEdit(edit: PendingEdit): void;
+  announceCommand(command: PendingCommand): void;
+}
 
-  /** Opens the native diff, then waits for resolve(). */
-  async request(edit: PendingEdit, announce: (edit: PendingEdit) => void): Promise<boolean> {
+export class ApprovalBroker implements ApprovalPort {
+  private readonly pending = new Map<string, PendingEntry>();
+
+  constructor(
+    private readonly proposals: ProposalProvider,
+    private readonly announcer: ApprovalAnnouncer
+  ) {}
+
+  /** Opens the native diff, shows the card, then waits for a click. */
+  async requestEdit(edit: PendingEdit): Promise<boolean> {
     const uri = this.proposals.set(edit.id, edit.relPath, edit.newText);
     await this.showDiff(edit, uri);
-    announce(edit);
+    this.announcer.announceEdit(edit);
+    return new Promise<boolean>((resolve) => this.pending.set(edit.id, { resolve, uri }));
+  }
 
-    return new Promise<boolean>((resolve) => {
-      this.pending.set(edit.id, { resolve, uri });
-    });
+  async requestCommand(command: PendingCommand): Promise<boolean> {
+    this.announcer.announceCommand(command);
+    return new Promise<boolean>((resolve) => this.pending.set(command.id, { resolve }));
   }
 
   /** Returns false if the id was unknown or already resolved. */
@@ -33,14 +50,14 @@ export class ApprovalBroker {
     const entry = this.pending.get(id);
     if (!entry) return false;
     this.pending.delete(id);
-    this.proposals.release(entry.uri);
+    if (entry.uri) this.proposals.release(entry.uri);
     entry.resolve(approved);
     return true;
   }
 
   /** Rejects everything outstanding — used when the user starts a new task. */
   rejectAll(): void {
-    for (const [id] of [...this.pending]) {
+    for (const id of [...this.pending.keys()]) {
       this.resolve(id, false);
     }
   }

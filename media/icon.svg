@@ -1,4 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M9 7 4 12l5 5"/>
-  <path d="m15 7 5 5-5 5"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <!-- Activity-bar icons are painted as a CSS mask, so only the alpha channel
+       matters. A FILLED path with an explicit colour is used rather than
+       stroke="currentColor": in a standalone SVG there is nothing for
+       currentColor to inherit from, and some renderers resolve it to
+       transparent, which makes the icon silently invisible. -->
+  <path fill="#C5C5C5" d="M10.6 5.4 12 6.8 6.8 12 12 17.2 10.6 18.6 4 12z"/>
+  <path fill="#C5C5C5" d="M13.4 5.4 20 12l-6.6 6.6L12 17.2 17.2 12 12 6.8z"/>
 </svg>

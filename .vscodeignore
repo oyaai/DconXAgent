@@ -7,4 +7,12 @@ node_modules/**
 esbuild.js
 tsconfig.json
 ARCHITECTURE.md
+instruction.md
 media/globals.d.ts
+.gitignore
+*.vsix
+dconx.config.json
+dist/web-server.js
+dist/web-server.js.map
+media/web-bridge.js
+media/web-theme.css

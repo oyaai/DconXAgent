@@ -1,0 +1,53 @@
+<!--
+  The chat markup, shared by BOTH frontends:
+    - the VS Code webview (src/vscode/webviewHtml.ts wraps it)
+    - the local web UI  (src/web/server.ts wraps it)
+  media/chat.js drives it in either case. Keep it free of anything
+  VS Code-specific so the two cannot drift apart.
+-->
+<div id="log" role="log" aria-live="polite"></div>
+<div id="composer">
+  <textarea id="input" rows="3"
+    placeholder="Describe the change you want. Every edit is shown as a diff for your approval."></textarea>
+  <div id="bar">
+    <button id="model" class="link" title="Pick an Ollama model">model: …</button>
+    <span id="status"></span>
+    <span class="spacer"></span>
+    <button id="stop" class="secondary" hidden>Stop</button>
+    <button id="send">Send</button>
+  </div>
+</div>
+<template id="approval-card">
+  <div class="card">
+    <header><span class="title"></span><span class="stat"></span></header>
+    <pre class="diff"></pre>
+    <div class="actions">
+      <button data-act="approve">Approve</button>
+      <button data-act="reject" class="secondary">Reject</button>
+    </div>
+  </div>
+</template>
+<template id="command-card">
+  <div class="card command">
+    <header><span class="title">Run command</span><span class="stat"></span></header>
+    <pre class="cmd"></pre>
+    <div class="actions">
+      <button data-act="approve">Run</button>
+      <button data-act="reject" class="secondary">Skip</button>
+    </div>
+  </div>
+</template>
+<template id="created-card">
+  <div class="card created">
+    <header><span class="title"></span><span class="stat"></span></header>
+    <div class="actions">
+      <button data-act="undo" class="secondary">Undo</button>
+    </div>
+  </div>
+</template>
+<template id="question-card">
+  <div class="card question">
+    <header><span class="title"></span></header>
+    <div class="actions choices"></div>
+  </div>
+</template>

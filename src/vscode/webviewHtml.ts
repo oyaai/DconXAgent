@@ -1,9 +1,14 @@
 /**
- * The webview shell. Styles and behaviour live in media/chat.css and
- * media/chat.js as real files — editable, diffable, and type-checked — instead
- * of being buried in a template literal.
+ * The webview shell.
+ *
+ * The markup lives in media/chat.body.html and the behaviour in media/chat.js —
+ * both shared verbatim with the local web UI, so a change to the chat panel
+ * lands in both frontends at once. This file only adds the VS Code-specific
+ * wrapper: the CSP, the nonce, and webview-resolved asset URIs.
  */
 
+import * as fs from "fs";
+import * as path from "path";
 import * as vscode from "vscode";
 
 function makeNonce(): string {
@@ -20,6 +25,10 @@ export function renderChatHtml(webview: vscode.Webview, extensionUri: vscode.Uri
 
   const styleUri = asset("media", "chat.css");
   const scriptUri = asset("media", "chat.js");
+  const body = fs.readFileSync(
+    path.join(extensionUri.fsPath, "media", "chat.body.html"),
+    "utf8"
+  );
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -30,28 +39,7 @@ export function renderChatHtml(webview: vscode.Webview, extensionUri: vscode.Uri
   <link rel="stylesheet" href="${styleUri}" />
 </head>
 <body>
-  <div id="log" role="log" aria-live="polite"></div>
-  <div id="composer">
-    <textarea id="input" rows="3"
-      placeholder="Describe the change you want. Every edit is shown as a diff for your approval."></textarea>
-    <div id="bar">
-      <button id="model" class="link" title="Pick an Ollama model">model: …</button>
-      <span id="status"></span>
-      <span class="spacer"></span>
-      <button id="stop" class="secondary" hidden>Stop</button>
-      <button id="send">Send</button>
-    </div>
-  </div>
-  <template id="approval-card">
-    <div class="card">
-      <header><span class="title"></span><span class="stat"></span></header>
-      <pre class="diff"></pre>
-      <div class="actions">
-        <button data-act="approve">Approve</button>
-        <button data-act="reject" class="secondary">Reject</button>
-      </div>
-    </div>
-  </template>
+${body}
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;

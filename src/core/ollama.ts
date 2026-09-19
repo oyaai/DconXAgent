@@ -40,19 +40,65 @@ export interface ChatResult {
   toolCalls: ToolCall[];
 }
 
-export async function listModels(baseUrl: string): Promise<string[]> {
-  const url = `${normalizeBaseUrl(baseUrl)}/api/tags`;
+/**
+ * Headers for every request. An API key is only meaningful for a remote server,
+ * but sending it to localhost is harmless, so there is no special case.
+ */
+export function buildHeaders(cfg: OllamaConfig): Record<string, string> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...cfg.headers,
+  };
+  if (cfg.apiKey.trim() !== "") {
+    headers.Authorization = `Bearer ${cfg.apiKey.trim()}`;
+  }
+  return headers;
+}
+
+/** Turns transport failures into a message that says what to check. */
+function describeFailure(cfg: OllamaConfig, e: unknown): string {
+  const message = (e as Error).message ?? String(e);
+  const base = normalizeBaseUrl(cfg.baseUrl);
+  const remote = !/^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:|$|\/)/.test(base);
+
+  if (!remote) {
+    return `Cannot reach Ollama at ${base}. Is it running? (${message})`;
+  }
+  return (
+    `Cannot reach the Ollama server at ${base}. (${message}) ` +
+    `For a remote server check: the host is up and reachable, it was started with ` +
+    `OLLAMA_HOST=0.0.0.0 so it listens beyond localhost, the port is open, and ` +
+    `dconx.ollama.apiKey is set if it requires a token.`
+  );
+}
+
+export async function listModels(cfg: OllamaConfig): Promise<string[]> {
+  const base = normalizeBaseUrl(cfg.baseUrl);
   let res: Response;
   try {
-    res = await fetch(url);
+    res = await fetch(`${base}/api/tags`, { headers: buildHeaders(cfg) });
   } catch (e) {
-    throw new OllamaError(`Cannot reach Ollama at ${baseUrl}. (${(e as Error).message})`);
+    throw new OllamaError(describeFailure(cfg, e));
   }
   if (!res.ok) {
-    throw new OllamaError(`Ollama returned ${res.status} from /api/tags`);
+    throw new OllamaError(explainStatus(res.status, base, "/api/tags"));
   }
   const data = (await res.json()) as { models?: Array<{ name: string }> };
   return (data.models ?? []).map((m) => m.name);
+}
+
+/** HTTP status codes a remote host actually returns, in words the user can act on. */
+export function explainStatus(status: number, base: string, path: string): string {
+  if (status === 401 || status === 403) {
+    return `Ollama at ${base} rejected the request (${status}). It needs an API key — set dconx.ollama.apiKey, or OLLAMA_API_KEY for the web UI.`;
+  }
+  if (status === 404) {
+    return `${base}${path} returned 404. Check the base URL: it should be the server root, without /api or /v1 on the end.`;
+  }
+  if (status === 429) {
+    return `Ollama at ${base} is rate limiting (429). Wait, or use a different endpoint.`;
+  }
+  return `Ollama ${path} returned ${status}.`;
 }
 
 export function normalizeBaseUrl(baseUrl: string): string {
@@ -80,24 +126,35 @@ export async function chat(
   };
 
   const base = normalizeBaseUrl(cfg.baseUrl);
+
+  // A remote host can accept the connection and then stall; without this the
+  // agent would hang with no way back except Stop.
+  const timeout = AbortSignal.timeout(cfg.requestTimeoutMs);
+  const combined = AbortSignal.any ? AbortSignal.any([signal, timeout]) : signal;
+
   let res: Response;
   try {
     res = await fetch(`${base}/api/chat`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: buildHeaders(cfg),
       body: JSON.stringify(body),
-      signal,
+      signal: combined,
     });
   } catch (e) {
-    if ((e as Error).name === "AbortError") throw e;
-    throw new OllamaError(
-      `Cannot reach Ollama at ${base}. Is it running? (${(e as Error).message})`
-    );
+    if (signal.aborted) throw e; // the user pressed Stop
+    if ((e as Error).name === "TimeoutError" || timeout.aborted) {
+      throw new OllamaError(
+        `${base} accepted the connection but sent no response within ${cfg.requestTimeoutMs} ms. ` +
+          `A large model on a slow remote host may need dconx.ollama.requestTimeoutMs raised.`
+      );
+    }
+    throw new OllamaError(describeFailure(cfg, e));
   }
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new OllamaError(`Ollama /api/chat returned ${res.status}: ${text.slice(0, 500)}`);
+    const detail = text.trim() === "" ? "" : `: ${text.slice(0, 300)}`;
+    throw new OllamaError(explainStatus(res.status, base, "/api/chat") + detail);
   }
 
   const data = (await res.json()) as {

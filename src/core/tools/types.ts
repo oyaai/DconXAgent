@@ -9,6 +9,7 @@
  */
 
 import type { GuardConfig } from "../config";
+import type { EditorPort, ShellPort } from "../ports";
 import type { ToolSchema } from "../ollama";
 import { GuardError } from "../errors";
 
@@ -28,6 +29,24 @@ export interface PendingEdit {
   removed: number;
 }
 
+/** A command the user has been asked to approve, before it runs. */
+export interface PendingCommand {
+  id: string;
+  command: string;
+  cwd: string;
+  /** The allowlist entry that permitted it — shown to the user for context. */
+  matchedRule: string;
+}
+
+/**
+ * The human gate. Both methods must resolve `true` only after an explicit click.
+ * This is the single chokepoint between the model and anything irreversible.
+ */
+export interface ApprovalPort {
+  requestEdit(edit: PendingEdit): Promise<boolean>;
+  requestCommand(command: PendingCommand): Promise<boolean>;
+}
+
 export interface AgentEvent {
   type: string;
   [key: string]: unknown;
@@ -38,11 +57,11 @@ export interface ToolContext {
   /** Absolute workspace root. All paths resolve against it. */
   root: string;
   cfg: GuardConfig;
-  /**
-   * Must resolve `true` only after a human has explicitly approved the diff.
-   * This is the single chokepoint between the model and the filesystem.
-   */
-  requestApproval(edit: PendingEdit): Promise<boolean>;
+  approve: ApprovalPort;
+  /** Read-only view of the user's editor. */
+  editor: EditorPort;
+  /** Runs commands that commandGuard has already validated and the user approved. */
+  shell: ShellPort;
   onEvent(event: AgentEvent): void;
 }
 

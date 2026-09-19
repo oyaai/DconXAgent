@@ -8,10 +8,11 @@
 
 import type { DconxConfig } from "./config";
 import { OllamaError } from "./errors";
+import type { EditorPort, ShellPort } from "./ports";
 import { ChatMessage, chat, parseToolArgs } from "./ollama";
 import { buildSystemPrompt } from "./prompt";
 import { TOOLS, TOOL_SCHEMAS, runTool } from "./tools";
-import type { AgentEvent, ToolContext } from "./tools/types";
+import type { AgentEvent, ApprovalPort, ToolContext } from "./tools/types";
 
 export type { AgentEvent };
 
@@ -21,7 +22,9 @@ export interface AgentHost {
   getConfig(): DconxConfig;
   /** Absolute workspace root. Throw to abort the turn with a readable message. */
   getWorkspaceRoot(): string;
-  requestApproval: ToolContext["requestApproval"];
+  approve: ApprovalPort;
+  editor: EditorPort;
+  shell: ShellPort;
   onEvent(event: AgentEvent): void;
 }
 
@@ -66,7 +69,7 @@ export class Agent {
     if (this.messages.length === 0) {
       this.messages.push({
         role: "system",
-        content: buildSystemPrompt(config.guard, root, TOOLS.map((t) => t.name)),
+        content: buildSystemPrompt(config, root, TOOLS.map((t) => t.name)),
       });
     }
     this.messages.push({ role: "user", content: userText });
@@ -74,7 +77,9 @@ export class Agent {
     const ctx: ToolContext = {
       root,
       cfg: config.guard,
-      requestApproval: this.host.requestApproval,
+      approve: this.host.approve,
+      editor: this.host.editor,
+      shell: this.host.shell,
       onEvent: (e) => this.host.onEvent(e),
     };
 

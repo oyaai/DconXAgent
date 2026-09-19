@@ -23,6 +23,10 @@ export function readConfig(): DconxConfig {
       model: ollama.get("model", d.ollama.model),
       temperature: ollama.get("temperature", d.ollama.temperature),
       numCtx: ollama.get("numCtx", d.ollama.numCtx),
+      // Env var wins over the setting, so a key need not be written into settings.json.
+      apiKey: process.env.OLLAMA_API_KEY ?? ollama.get("apiKey", d.ollama.apiKey),
+      headers: ollama.get("headers", d.ollama.headers),
+      requestTimeoutMs: ollama.get("requestTimeoutMs", d.ollama.requestTimeoutMs),
     },
     guard: {
       denyGlobs: guard.get("denyGlobs", d.guard.denyGlobs),
@@ -30,10 +34,16 @@ export function readConfig(): DconxConfig {
       maxEditLines: guard.get("maxEditLines", d.guard.maxEditLines),
       maxFileBytes: guard.get("maxFileBytes", d.guard.maxFileBytes),
       allowCreate: guard.get("allowCreate", d.guard.allowCreate),
+      autoApproveCreate: guard.get("autoApproveCreate", d.guard.autoApproveCreate),
       allowDelete: guard.get("allowDelete", d.guard.allowDelete),
+      allowCommands: guard.get("allowCommands", d.guard.allowCommands),
+      commandAllowlist: guard.get("commandAllowlist", d.guard.commandAllowlist),
+      commandTimeoutMs: guard.get("commandTimeoutMs", d.guard.commandTimeoutMs),
+      commandOutputLimit: guard.get("commandOutputLimit", d.guard.commandOutputLimit),
     },
     agent: {
       maxIterations: agent.get("maxIterations", d.agent.maxIterations),
+      scratchFolder: agent.get("scratchFolder", d.agent.scratchFolder),
     },
   };
 }

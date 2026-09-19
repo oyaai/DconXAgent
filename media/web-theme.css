@@ -1,0 +1,71 @@
+/*
+  Supplies the --vscode-* variables that chat.css expects, so the SAME stylesheet
+  works in a plain browser. Loaded only by the web UI; inside VS Code the real
+  theme provides these and this file is not served.
+
+  Values follow VS Code's Dark+/Light+ so the two frontends look like one product.
+*/
+
+:root {
+  color-scheme: light dark;
+
+  --vscode-font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --vscode-font-size: 13px;
+  --vscode-editor-font-family: ui-monospace, "Cascadia Code", "Consolas", monospace;
+
+  /* Light+ */
+  --vscode-foreground: #3b3b3b;
+  --vscode-descriptionForeground: #6a6a6a;
+  --vscode-errorForeground: #c7222a;
+  --vscode-sideBar-background: #f8f8f8;
+  --vscode-editor-background: #ffffff;
+  --vscode-editorWidget-background: #f3f3f3;
+  --vscode-input-background: #ffffff;
+  --vscode-input-foreground: #3b3b3b;
+  --vscode-input-border: #cecece;
+  --vscode-panel-border: #e5e5e5;
+  --vscode-focusBorder: #005fb8;
+  --vscode-button-background: #005fb8;
+  --vscode-button-foreground: #ffffff;
+  --vscode-button-secondaryBackground: #e5e5e5;
+  --vscode-button-secondaryForeground: #3b3b3b;
+  --vscode-gitDecoration-addedResourceForeground: #107c10;
+  --vscode-gitDecoration-deletedResourceForeground: #c7222a;
+  --vscode-scrollbarSlider-background: rgba(100, 100, 100, 0.4);
+  --vscode-scrollbarSlider-hoverBackground: rgba(100, 100, 100, 0.7);
+  --vscode-scrollbarSlider-activeBackground: rgba(0, 0, 0, 0.6);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Dark+ */
+    --vscode-foreground: #cccccc;
+    --vscode-descriptionForeground: #9d9d9d;
+    --vscode-errorForeground: #f14c4c;
+    --vscode-sideBar-background: #181818;
+    --vscode-editor-background: #1f1f1f;
+    --vscode-editorWidget-background: #252526;
+    --vscode-input-background: #313131;
+    --vscode-input-foreground: #cccccc;
+    --vscode-input-border: #3c3c3c;
+    --vscode-panel-border: #2b2b2b;
+    --vscode-focusBorder: #0078d4;
+    --vscode-button-background: #0078d4;
+    --vscode-button-foreground: #ffffff;
+    --vscode-button-secondaryBackground: #313131;
+    --vscode-button-secondaryForeground: #cccccc;
+    --vscode-gitDecoration-addedResourceForeground: #4ec94e;
+    --vscode-gitDecoration-deletedResourceForeground: #f14c4c;
+    --vscode-scrollbarSlider-background: rgba(121, 121, 121, 0.4);
+    --vscode-scrollbarSlider-hoverBackground: rgba(100, 100, 100, 0.7);
+    --vscode-scrollbarSlider-activeBackground: rgba(191, 191, 191, 0.4);
+  }
+}
+
+/* The browser has no side bar around the panel, so give it a readable column. */
+body {
+  max-width: 1100px;
+  margin: 0 auto;
+  border-left: 1px solid var(--vscode-panel-border);
+  border-right: 1px solid var(--vscode-panel-border);
+}

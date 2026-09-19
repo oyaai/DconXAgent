@@ -11,8 +11,12 @@
 
 import { GuardError } from "../errors";
 import type { ToolSchema } from "../ollama";
+import { askUser } from "./askUser";
 import { attemptCompletion } from "./attemptCompletion";
+import { diagnostics } from "./diagnostics";
+import { editorContext } from "./editorContext";
 import { listFiles } from "./listFiles";
+import { runCommand } from "./runCommand";
 import { readFile } from "./readFile";
 import { replaceInFile } from "./replaceInFile";
 import { searchFiles } from "./searchFiles";
@@ -20,11 +24,15 @@ import { writeFile } from "./writeFile";
 import type { ToolContext, ToolDefinition, ToolOutcome } from "./types";
 
 export const TOOLS: readonly ToolDefinition[] = [
+  editorContext,
   listFiles,
   readFile,
   searchFiles,
+  diagnostics,
   replaceInFile,
   writeFile,
+  runCommand,
+  askUser,
   attemptCompletion,
 ];
 
@@ -65,3 +73,4 @@ export async function runTool(
 
 export * from "./types";
 export { proposeEdit, resetEditSequence } from "./editGate";
+export { resetCommandSequence } from "./runCommand";

@@ -1,27 +1,49 @@
+/**
+ * Builds both frontends from one source tree:
+ *   dist/extension.js   the VS Code extension  (vscode is external)
+ *   dist/web-server.js  the local web UI       (plain node)
+ */
+
 const esbuild = require("esbuild");
 
 const production = process.argv.includes("--production");
 const watch = process.argv.includes("--watch");
 
-async function main() {
-  const ctx = await esbuild.context({
+const targets = [
+  {
     entryPoints: ["src/extension.ts"],
-    bundle: true,
-    format: "cjs",
-    minify: production,
-    sourcemap: !production,
-    sourcesContent: false,
-    platform: "node",
-    target: "node18",
     outfile: "dist/extension.js",
     external: ["vscode"],
-    logLevel: "info",
-  });
+  },
+  {
+    entryPoints: ["src/web/server.ts"],
+    outfile: "dist/web-server.js",
+    external: [],
+  },
+];
+
+async function main() {
+  const contexts = await Promise.all(
+    targets.map((target) =>
+      esbuild.context({
+        ...target,
+        bundle: true,
+        format: "cjs",
+        minify: production,
+        sourcemap: !production,
+        sourcesContent: false,
+        platform: "node",
+        target: "node18",
+        logLevel: "info",
+      })
+    )
+  );
+
   if (watch) {
-    await ctx.watch();
+    await Promise.all(contexts.map((c) => c.watch()));
   } else {
-    await ctx.rebuild();
-    await ctx.dispose();
+    await Promise.all(contexts.map((c) => c.rebuild()));
+    await Promise.all(contexts.map((c) => c.dispose()));
   }
 }
 

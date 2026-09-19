@@ -62,6 +62,11 @@ async function buildEdit(
 
 /**
  * Builds the edit, asks the human, and writes only on approval.
+ *
+ * The one exception is creating a file when `autoApproveCreate` is on: a create
+ * cannot overwrite anything, so it is written straight away and reported with an
+ * Undo affordance instead. Modifying an existing file ALWAYS waits for a click.
+ *
  * The returned text is what the model sees, so it is phrased to steer the model:
  * a rejection explicitly tells it not to retry.
  */
@@ -73,7 +78,22 @@ export async function proposeEdit(
 ): Promise<ToolOutcome> {
   const edit = await buildEdit(relPath, absPath, newText, ctx);
 
-  const approved = await ctx.requestApproval(edit);
+  if (edit.kind === "create" && ctx.cfg.autoApproveCreate) {
+    await write(edit);
+    ctx.onEvent({
+      type: "autoCreated",
+      id: edit.id,
+      relPath: edit.relPath,
+      absPath: edit.absPath,
+      content: edit.newText,
+      added: edit.added,
+    });
+    return {
+      text: `CREATED ${edit.relPath} (${edit.added} lines). Auto-approved because the file did not exist. Continue with the next file.`,
+    };
+  }
+
+  const approved = await ctx.approve.requestEdit(edit);
   if (!approved) {
     ctx.onEvent({ type: "rejected", relPath: edit.relPath, id: edit.id });
     return {
@@ -83,9 +103,14 @@ export async function proposeEdit(
     };
   }
 
-  await fs.mkdir(path.dirname(absPath), { recursive: true });
-  await fs.writeFile(absPath, newText, "utf8");
+  await write(edit);
   ctx.onEvent({ type: "applied", relPath: edit.relPath, id: edit.id });
 
   return { text: `APPROVED and written to ${edit.relPath} (+${edit.added}/-${edit.removed}).` };
+}
+
+/** The single point where anything in core reaches the filesystem to write. */
+async function write(edit: PendingEdit): Promise<void> {
+  await fs.mkdir(path.dirname(edit.absPath), { recursive: true });
+  await fs.writeFile(edit.absPath, edit.newText, "utf8");
 }
