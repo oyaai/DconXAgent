@@ -185,3 +185,62 @@ export function parseToolArgs(call: ToolCall): Record<string, unknown> {
   }
   return raw ?? {};
 }
+
+/**
+ * Small local models sometimes fail to use Ollama's native tool-calling channel and
+ * instead print the call as plain JSON text — `{"name":"ask_user","arguments":{...}}`,
+ * often inside a ```json fence, occasionally with a sentence before or after it. When
+ * that happens `chat()` returns an empty toolCalls array and the JSON ends up as a wall
+ * of text in the chat with no button and no next step, which looks like the agent hung.
+ *
+ * This recovers the call so the rest of the agent loop can treat it exactly like a real
+ * tool call. It only fires when the parsed object names a tool the agent actually has,
+ * so ordinary prose that happens to contain braces is never mistaken for a call.
+ */
+export function extractFallbackToolCall(
+  content: string,
+  toolNames: readonly string[]
+): ToolCall | undefined {
+  const trimmed = content.trim();
+  if (trimmed === "") return undefined;
+
+  for (const candidate of candidateJsonSlices(trimmed)) {
+    const call = tryParseToolCallJson(candidate);
+    if (call && toolNames.includes(call.function.name)) {
+      return call;
+    }
+  }
+  return undefined;
+}
+
+function candidateJsonSlices(text: string): string[] {
+  const slices = [text];
+
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced) slices.push(fenced[1].trim());
+
+  const first = text.indexOf("{");
+  const last = text.lastIndexOf("}");
+  if (first !== -1 && last > first) slices.push(text.slice(first, last + 1));
+
+  return slices;
+}
+
+function tryParseToolCallJson(text: string): ToolCall | undefined {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+  if (typeof parsed !== "object" || parsed === null) return undefined;
+
+  const rec = parsed as Record<string, unknown>;
+  const name = typeof rec.name === "string" ? rec.name : undefined;
+  const args = rec.arguments;
+  const argsLookLikeArgs =
+    (typeof args === "object" && args !== null) || typeof args === "string";
+  if (!name || !argsLookLikeArgs) return undefined;
+
+  return { function: { name, arguments: args as Record<string, unknown> | string } };
+}

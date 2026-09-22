@@ -22,6 +22,8 @@ const ENTRIES = [
   "src/core/commandGuard.ts",
   "src/core/config.ts",
   "src/core/prompt.ts",
+  "src/core/ollama.ts",
+  "src/core/agent.ts",
   "src/core/tools/index.ts",
 ];
 

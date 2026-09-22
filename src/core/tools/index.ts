@@ -16,6 +16,7 @@ import { attemptCompletion } from "./attemptCompletion";
 import { diagnostics } from "./diagnostics";
 import { editorContext } from "./editorContext";
 import { listFiles } from "./listFiles";
+import { pickFolderName } from "./pickFolderName";
 import { runCommand } from "./runCommand";
 import { readFile } from "./readFile";
 import { replaceInFile } from "./replaceInFile";
@@ -31,6 +32,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   diagnostics,
   replaceInFile,
   writeFile,
+  pickFolderName,
   runCommand,
   askUser,
   attemptCompletion,

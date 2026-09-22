@@ -35,6 +35,20 @@ t.ok(
   prompt.includes(DEFAULT_CONFIG.agent.scratchFolder),
   "the scratch folder is offered by name"
 );
+
+// --- the fix for "user already said where it goes, but the model asked again anyway"
+t.ok(
+  /did they already say where it goes/i.test(prompt),
+  "the model is told to check the user's own message before asking about location"
+);
+t.ok(
+  /do NOT call ask_user in that case/i.test(prompt),
+  "asking again after the user already answered is explicitly forbidden"
+);
+t.ok(
+  /take the base name from whatever the user actually said/i.test(prompt),
+  "a folder name the user gave is used verbatim, not replaced with a guessed one"
+);
 t.ok(/npm install/.test(prompt), "the model is told to hand back run instructions");
 t.ok(
   /cannot install packages/i.test(prompt),

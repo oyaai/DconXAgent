@@ -364,6 +364,34 @@ const read = (rel) => fs.readFileSync(path.join(root, rel), "utf8");
   out = await runTool("ask_user", {}, h.ctx);
   t.ok(out.text.startsWith("GUARD:"), "a question with no text is rejected");
 
+  // --- pick_folder_name: the fix for "agent should be able to start a new
+  // project even when a previously-generated one is already sitting there"
+  h = makeCtx(null); // read-only — never asks for approval
+  out = await runTool("pick_folder_name", { base: "react-demo" }, h.ctx);
+  t.ok(out.text.includes('"react-demo" is free'), "a name with no collision is returned as-is");
+
+  fs.mkdirSync(path.join(root, "react-demo"));
+  fs.writeFileSync(path.join(root, "react-demo", "package.json"), "{}\n");
+  out = await runTool("pick_folder_name", { base: "react-demo" }, h.ctx);
+  t.ok(out.text.includes("already exists"), "an existing folder is reported as taken");
+  t.ok(out.text.includes('"react-demo-2"'), "a free sibling name is offered instead");
+  t.equal(h.state.approvalRequests, 0, "checking for a free name never interrupts the user");
+
+  fs.mkdirSync(path.join(root, "react-demo-2"));
+  out = await runTool("pick_folder_name", { base: "react-demo" }, h.ctx);
+  t.ok(out.text.includes('"react-demo-3"'), "the next free suffix is found when -2 is also taken");
+
+  // A plain file at the candidate path counts as taken too, not just a directory.
+  fs.writeFileSync(path.join(root, "single-file"), "x\n");
+  out = await runTool("pick_folder_name", { base: "single-file" }, h.ctx);
+  t.ok(out.text.includes('"single-file-2"'), "a colliding file, not just a folder, is detected");
+
+  out = await runTool("pick_folder_name", { base: "../escape" }, h.ctx);
+  t.ok(out.text.startsWith("GUARD:"), "pick_folder_name is still subject to the path guard");
+
+  out = await runTool("pick_folder_name", {}, h.ctx);
+  t.ok(out.text.startsWith("GUARD:"), "a missing base argument is rejected, not guessed");
+
   fs.rmSync(root, { recursive: true, force: true });
   process.exit(t.finish() ? 1 : 0);
 })();
